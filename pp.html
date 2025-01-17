@@ -155,18 +155,14 @@
                 priority.push(parseInt(inputs[3].value));
             }
             
-            const result = pp(arrival, burst, priority);
+            const result = pp(process_names, arrival, burst, priority);
             displayResults(result);
         }
 
-        function pp(arrivalTime, burstTime, priorities) {
+        function pp(processNames, arrivalTime, burstTime, priorities) {
             const processesInfo = arrivalTime
                 .map((item, index) => {
-                    const job =
-                        arrivalTime.length > 26
-                            ? `P${index + 1}`
-                            : (index + 10).toString(36).toUpperCase();
-
+                    const job = processNames[index];
                     return {
                         job,
                         at: item,
