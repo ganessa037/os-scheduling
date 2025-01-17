@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CPU Scheduling Simulator (Preemptive Priority)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .gantt-chart {
+            display: flex;
+            margin: 20px 0;
+            overflow-x: auto;
+            min-height: 80px;
+        }
+        
+        .gantt-block {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 10px;
+            margin: 2px;
+            min-width: 80px;
+            text-align: center;
+            color: white;
+            position: relative;
+        }
+        
+        .gantt-time {
+            position: absolute;
+            bottom: -25px;
+            left: 0;
+            width: 100%;
+            color: black;
+            font-size: 12px;
+        }
+        
+        .process-row {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">CPU Scheduling Simulator (Preemptive Priority)</h3>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <button class="btn btn-success" onclick="addProcess()">
+                            <i class="bi bi-plus-circle"></i> Add Process
+                        </button>
+                    </div>
+                </div>
+
+                <div id="processes"></div>
+
+                <button class="btn btn-primary mt-3" onclick="simulate()">
+                    Simulate
+                </button>
+
+                <div id="results" class="mt-4">
+                    <h4>Gantt Chart</h4>
+                    <div class="gantt-chart" id="gantt-chart"></div>
+
+                    <h4 class="mt-4">Process Details</h4>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Process</th>
+                                    <th>Arrival Time</th>
+                                    <th>Burst Time</th>
+                                    <th>Priority</th>
+                                    <th>Completion Time</th>
+                                    <th>Turnaround Time</th>
+                                    <th>Waiting Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="process-table"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header bg-info text-white">
+                            Statistics
+                        </div>
+                        <div class="card-body" id="stats"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let processCount = 0;
+        const colors = ['#198754', '#0d6efd', '#dc3545', '#6f42c1', '#fd7e14', '#20c997'];
+
+        function addProcess() {
+            const processDiv = document.createElement('div');
+            processDiv.className = 'process-row';
+            processDiv.innerHTML = `
+                <div class="row">
+                    <div class="col-md-2">
+                        <div class="form-group">
+                            <label>Process Name</label>
+                            <input type="text" class="form-control" value="P${processCount}">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-group">
+                            <label>Arrival Time</label>
+                            <input type="number" class="form-control" value="${processCount}">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-group">
+                            <label>Burst Time</label>
+                            <input type="number" class="form-control" value="4">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-group">
+                            <label>Priority</label>
+                            <input type="number" class="form-control" value="1">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-danger mt-4" onclick="this.parentElement.parentElement.parentElement.remove()">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('processes').appendChild(processDiv);
+            processCount++;
+        }
+
+        function simulate() {
+            const processDivs = document.getElementById('processes').children;
+            const n = processDivs.length;
+            
+            const process_names = [];
+            const arrival = [];
+            const burst = [];
+            const priority = [];
+            
+            for(let i = 0; i < n; i++) {
+                const inputs = processDivs[i].getElementsByTagName('input');
+                process_names.push(inputs[0].value);
+                arrival.push(parseInt(inputs[1].value));
+                burst.push(parseInt(inputs[2].value));
+                priority.push(parseInt(inputs[3].value));
+            }
+            
+            const result = pp(arrival, burst, priority);
+            displayResults(result);
+        }
+
+        function pp(arrivalTime, burstTime, priorities) {
+            const processesInfo = arrivalTime
+                .map((item, index) => {
+                    const job =
+                        arrivalTime.length > 26
+                            ? `P${index + 1}`
+                            : (index + 10).toString(36).toUpperCase();
+
+                    return {
+                        job,
+                        at: item,
+                        bt: burstTime[index],
+                        priority: priorities[index],
+                    };
+                })
+                .sort((process1, process2) => {
+                    if (process1.at > process2.at) return 1;
+                    if (process1.at < process2.at) return -1;
+                    if (process1.priority > process2.priority) return 1;
+                    if (process1.priority < process2.priority) return -1;
+                    return 0;
+                });
+
+            const solvedProcessesInfo = [];
+            const ganttChartInfo = [];
+
+            const readyQueue = [];
+            let currentTime = processesInfo[0].at;
+            const unfinishedJobs = [...processesInfo];
+
+            const remainingTime = processesInfo.reduce((acc, process) => {
+                acc[process.job] = process.bt;
+                return acc;
+            }, {});
+
+            readyQueue.push(unfinishedJobs[0]);
+            while (
+                Object.values(remainingTime).reduce((acc, cur) => acc + cur, 0) &&
+                unfinishedJobs.length > 0
+            ) {
+                let prevIdle = false;
+                if (readyQueue.length === 0 && unfinishedJobs.length > 0) {
+                    prevIdle = true;
+                    readyQueue.push(unfinishedJobs[0]);
+                }
+
+                readyQueue.sort((a, b) => {
+                    if (a.priority > b.priority) return 1;
+                    if (a.priority < b.priority) return -1;
+                    return 0;
+                });
+
+                const processToExecute = readyQueue[0];
+
+                const processATLessThanBT = processesInfo.filter((p) => {
+                    let curr = currentTime;
+                    if (prevIdle) {
+                        curr = processToExecute.at;
+                    }
+
+                    return (
+                        p.at <= remainingTime[processToExecute.job] + curr &&
+                        p !== processToExecute &&
+                        !readyQueue.includes(p) &&
+                        unfinishedJobs.includes(p)
+                    );
+                });
+                let gotInterruption = false;
+                processATLessThanBT.some((p) => {
+                    if (prevIdle) {
+                        currentTime = processToExecute.at;
+                    }
+
+                    const amount = p.at - currentTime;
+
+                    if (currentTime >= p.at) {
+                        readyQueue.push(p);
+                    }
+
+                    if (p.priority < processToExecute.priority) {
+                        remainingTime[processToExecute.job] -= amount;
+                        readyQueue.push(p);
+                        const prevCurrentTime = currentTime;
+                        currentTime += amount;
+                        ganttChartInfo.push({
+                            job: processToExecute.job,
+                            start: prevCurrentTime,
+                            stop: currentTime,
+                        });
+                        gotInterruption = true;
+                        return true;
+                    }
+                });
+                const processToArrive = processesInfo.filter((p) => {
+                    return (
+                        p.at <= currentTime &&
+                        p !== processToExecute &&
+                        !readyQueue.includes(p) &&
+                        unfinishedJobs.includes(p)
+                    );
+                });
+
+                readyQueue.push(...processToArrive);
+
+                if (!gotInterruption) {
+                    if (prevIdle) {
+                        const remainingT = remainingTime[processToExecute.job];
+                        remainingTime[processToExecute.job] -= remainingT;
+                        currentTime = processToExecute.at + remainingT;
+
+                        processATLessThanBT.forEach((p) => {
+                            if (currentTime >= p.at) {
+                                readyQueue.push(p);
+                            }
+                        });
+
+                        ganttChartInfo.push({
+                            job: processToExecute.job,
+                            start: processToExecute.at,
+                            stop: currentTime,
+                        });
+                    } else {
+                        const remainingT = remainingTime[processToExecute.job];
+                        remainingTime[processToExecute.job] -= remainingT;
+                        const prevCurrentTime = currentTime;
+                        currentTime += remainingT;
+
+                        processATLessThanBT.forEach((p) => {
+                            if (currentTime >= p.at && !readyQueue.includes(p)) {
+                                readyQueue.push(p);
+                            }
+                        });
+
+                        ganttChartInfo.push({
+                            job: processToExecute.job,
+                            start: prevCurrentTime,
+                            stop: currentTime,
+                        });
+                    }
+                }
+
+                readyQueue.push(readyQueue.shift());
+
+                if (remainingTime[processToExecute.job] === 0) {
+                    const indexToRemoveUJ = unfinishedJobs.indexOf(processToExecute);
+                    if (indexToRemoveUJ > -1) {
+                        unfinishedJobs.splice(indexToRemoveUJ, 1);
+                    }
+                    const indexToRemoveRQ = readyQueue.indexOf(processToExecute);
+                    if (indexToRemoveRQ > -1) {
+                        readyQueue.splice(indexToRemoveRQ, 1);
+                    }
+
+                    solvedProcessesInfo.push({
+                        ...processToExecute,
+                        ft: currentTime,
+                        tat: currentTime - processToExecute.at,
+                        wat: currentTime - processToExecute.at - processToExecute.bt,
+                    });
+                }
+            }
+
+            solvedProcessesInfo.sort((process1, process2) => {
+                if (process1.at > process2.at) return 1;
+                if (process1.at < process2.at) return -1;
+                if (process1.job > process2.job) return 1;
+                if (process1.job < process2.job) return -1;
+                return 0;
+            });
+
+            return { solvedProcessesInfo, ganttChartInfo };
+        }
+
+        function displayResults(result) {
+            // Display Gantt Chart
+            const ganttChart = document.getElementById('gantt-chart');
+            ganttChart.innerHTML = '';
+            result.ganttChartInfo.forEach((block, index) => {
+                const div = document.createElement('div');
+                div.className = 'gantt-block';
+                div.style.backgroundColor = colors[index % colors.length];
+                div.innerHTML = `
+                    ${block.job}
+                    <span class="gantt-time">${block.start}-${block.stop}</span>
+                `;
+                ganttChart.appendChild(div);
+            });
+            
+            // Display Process Table
+            const tableBody = document.getElementById('process-table');
+            tableBody.innerHTML = '';
+            
+            result.solvedProcessesInfo.forEach((process, index) => {
+                tableBody.innerHTML += `
+                    <tr>
+                        <td>${process.job}</td>
+                        <td>${process.at}</td>
+                        <td>${process.bt}</td>
+                        <td>${process.priority}</td>
+                        <td>${process.ft}</td>
+                        <td>${process.tat}</td>
+                        <td>${process.wat}</td>
+                    </tr>
+                `;
+            });
+            
+            // Display Stats
+            const avgTurnaroundTime = result.solvedProcessesInfo.reduce((acc, process) => acc + process.tat, 0) / result.solvedProcessesInfo.length;
+            const avgWaitingTime = result.solvedProcessesInfo.reduce((acc, process) => acc + process.wat, 0) / result.solvedProcessesInfo.length;
+
+            document.getElementById('stats').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Average Turnaround Time:</h5>
+                        <p class="h3 text-primary">${avgTurnaroundTime.toFixed(3)}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Average Waiting Time:</h5>
+                        <p class="h3 text-success">${avgWaitingTime.toFixed(3)}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Add initial process
+        addProcess();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
