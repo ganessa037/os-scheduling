@@ -488,6 +488,16 @@
             // Display Stats
             document.getElementById('stats').innerHTML = `
                 <div class="row">
+                     <div class="col-md-6">
+                        <h5>Total Turnaround Time:</h5>
+                        <p class="h3 text-primary">${result.TotalTurnaroundTime.toFixed(3)}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Total Waiting Time:</h5>
+                        <p class="h3 text-success">${result.TotalWaitingTime.toFixed(3)}</p>
+                    </div>
+                </div>
+                <div class="row">
                     <div class="col-md-6">
                         <h5>Average Turnaround Time:</h5>
                         <p class="h3 text-primary">${result.AverageTurnaroundTime.toFixed(3)}</p>

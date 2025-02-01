@@ -403,11 +403,27 @@
                 `;
             });
             
+           // Calculate totals
+            const totalTurnaroundTime = result.solvedProcessesInfo.reduce((acc, process) => acc + process.tat, 0);
+            const totalWaitingTime = result.solvedProcessesInfo.reduce((acc, process) => acc + process.wat, 0);
+
+
             // Display Stats
             const avgTurnaroundTime = result.solvedProcessesInfo.reduce((acc, process) => acc + process.tat, 0) / result.solvedProcessesInfo.length;
             const avgWaitingTime = result.solvedProcessesInfo.reduce((acc, process) => acc + process.wat, 0) / result.solvedProcessesInfo.length;
 
+
             document.getElementById('stats').innerHTML = `
+                 <div class="row">
+                    <div class="col-md-6">
+                        <h5>Total Turnaround Time:</h5>
+                        <p class="h3 text-primary">${totalTurnaroundTime.toFixed(3)}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Total Waiting Time:</h5>
+                        <p class="h3 text-success">${totalWaitingTime.toFixed(3)}</p>
+                    </div>
+                </div>
                 <div class="row">
                     <div class="col-md-6">
                         <h5>Average Turnaround Time:</h5>
